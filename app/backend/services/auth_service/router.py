@@ -15,10 +15,13 @@ from utils.get_current_user import get_current_user
 from utils.jwt_handler import create_access_token
 from .functions import update_last_login, get_all_users, update_user_data
 from typing import List
+import requests
+import os
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 admin_only = RoleChecker(allowed_roles=["admin"])
 
+API_GATEWAY_URL = os.getenv("API_GATEWAY_URL", "https://example.com/lambda-endpoint")
 hash = Hash()
 
 
@@ -89,9 +92,6 @@ async def admin_login(data: UserLogin = Body(...), db: Session = Depends(get_db)
 
 @router.post("/signup", response_model=RetrieveUserBase, status_code=response_status.HTTP_201_CREATED)
 async def signup_user(user: CreateUserBase = Body(...), db: Session = Depends(get_db)) -> RetrieveUserBase:
-    """
-    Create a new user in the database.
-    """
     user_data = User(**user.model_dump(exclude_unset=True))
     user_data.password = hash.get_password_hash(user.password)
 
@@ -100,6 +100,18 @@ async def signup_user(user: CreateUserBase = Body(...), db: Session = Depends(ge
             raise HTTPException(status_code=response_status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
         user_data = create_user(user_data, db)
+
+        try:
+            payload = {
+                "email": user_data.email,
+                "name": f"{user_data.first_name} {user_data.last_name}"
+            }
+            resp = requests.post(API_GATEWAY_URL, json=payload)
+            if resp.status_code != 200:
+                print(f"Error Lambda: {resp.text}")
+        except Exception as e:
+            print(f"No se pudo invocar Lambda: {e}")
+
         return user_data
 
     except HTTPException as e:
