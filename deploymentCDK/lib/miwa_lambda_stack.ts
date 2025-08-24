@@ -3,6 +3,7 @@ import * as cdk from "aws-cdk-lib";
 import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import * as apigw from "aws-cdk-lib/aws-apigateway";
 import { Code, Function, Runtime } from "aws-cdk-lib/aws-lambda";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import { Construct } from "constructs";
 import * as path from "path";
 
@@ -47,5 +48,21 @@ export class MiwaStack extends cdk.Stack {
     // const queue = new sqs.Queue(this, "DeploymentCdkQueue", {
     //   visibilityTimeout: cdk.Duration.seconds(300)
     // });
+
+    // --- S3 Bucket ---
+    const miwaBucket = new s3.Bucket(this, "miwa-files-bucket", {
+      removalPolicy: RemovalPolicy.DESTROY, // Solo para desarrollo, en prod usar RETAIN
+      autoDeleteObjects: true, // Solo para desarrollo
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+    });
+
+    // Permitir a la Lambda acceso completo al bucket
+    miwaBucket.grantReadWrite(lambdaFn);
+
+    // Exportar el nombre del bucket como output
+    new cdk.CfnOutput(this, "MiwaBucketName", {
+      value: miwaBucket.bucketName,
+      description: "Nombre del bucket S3 para archivos de Miwa",
+    });
   }
 }
