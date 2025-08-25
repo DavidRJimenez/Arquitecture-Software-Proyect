@@ -1,27 +1,37 @@
-// Funciones para interactuar con el backend S3
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// lib/api/s3.ts
+import { apiFetch } from "./client";
 
-export async function uploadFile(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append("file", file);
-  const res = await fetch(`${API_URL}/s3/upload`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!res.ok) throw new Error("Error al subir archivo");
-  return await res.text();
+export interface S3Item {
+  key: string;
+  name: string;
 }
 
-export async function listFiles(): Promise<string[]> {
-  const res = await fetch(`${API_URL}/s3/list`);
-  if (!res.ok) throw new Error("Error al listar archivos");
-  return await res.json();
+export async function uploadRecording(file: File): Promise<string> {
+  const fd = new FormData();
+  fd.append("file", file); // clave debe llamarse "file"
+  return apiFetch<string>("/s3/upload", { method: "POST", body: fd });
 }
 
-export async function deleteFile(filename: string): Promise<boolean> {
-  const res = await fetch(`${API_URL}/s3/delete/${encodeURIComponent(filename)}`, {
+export async function listRecordings(prefix?: string): Promise<S3Item[]> {
+  const q = prefix ? `?prefix=${encodeURIComponent(prefix)}` : "";
+  const keys = await apiFetch<string[]>(`/s3/list${q}`, { method: "GET" });
+  return keys.map((k) => ({ key: k, name: k.split("/").pop() || k }));
+}
+
+export async function deleteRecording(key: string): Promise<boolean> {
+  return apiFetch<boolean>(`/s3/delete/${encodeURIComponent(key)}`, {
     method: "DELETE",
   });
-  if (!res.ok) throw new Error("Error al borrar archivo");
-  return await res.json();
+}
+
+export async function getDownloadUrl(
+  key: string,
+  expiresSeconds = 900
+): Promise<string> {
+  return apiFetch<string>(
+    `/s3/download-url/${encodeURIComponent(
+      key
+    )}?expires_seconds=${expiresSeconds}`,
+    { method: "GET" }
+  );
 }
