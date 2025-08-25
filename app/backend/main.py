@@ -3,7 +3,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from services.auth_service.router import router as auth_router
-from services.s3_router import router as s3_router
+from services.s3_service.router import router as s3_router
 
 app = FastAPI(
     debug=os.getenv("DEBUG", False),
@@ -19,10 +19,10 @@ app.add_middleware(
 )
 
 
-
 @app.get("/")
 def root():
     return {"message": "¡Bienvenido a la API de MIWA!"}
+
 
 app.include_router(auth_router, tags=["Authentication"])
 app.include_router(s3_router)

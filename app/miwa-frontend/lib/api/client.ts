@@ -1,45 +1,36 @@
 // lib/api/client.ts
-import { getToken } from "./token";
-
+import { getToken, clearToken } from "./token";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-export class ApiError extends Error {
-  status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
+export class ApiError extends Error { status: number; constructor(s: number, m: string){ super(m); this.status=s; } }
 
-type Options = RequestInit & { skipAuth?: boolean };
+type Options = RequestInit & { skipAuth?: boolean; redirectOn401?: boolean };
 
 export async function apiFetch<T = unknown>(endpoint: string, options: Options = {}): Promise<T> {
   const token = options.skipAuth ? null : getToken();
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
 
   const res = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      // ❗️no pongas Content-Type si envías FormData
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
   });
 
-  // Intenta parsear JSON (éxito o error)
-  let data: any = null;
   const text = await res.text();
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = text || null;
-  }
+  let data: any = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = text || null; }
 
   if (!res.ok) {
-    const detail = typeof data?.detail === "string"
-      ? data.detail
-      : data?.message ?? `Error ${res.status}`;
-    throw new ApiError(res.status, detail);
+    const msg = typeof data?.detail === "string" ? data.detail : data?.message ?? `Error ${res.status}`;
+    if (res.status === 401 && options.redirectOn401 !== false) {
+      clearToken();
+      if (typeof window !== "undefined") window.location.replace("/admin-login");
+    }
+    throw new ApiError(res.status, msg);
   }
-
   return data as T;
 }

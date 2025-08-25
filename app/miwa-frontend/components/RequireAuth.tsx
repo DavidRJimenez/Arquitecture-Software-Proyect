@@ -15,7 +15,7 @@ export default function RequireAuth({
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (!token) {
-      router.replace("/admin-login");
+      router.replace("/login");
     } else {
       setAllowed(true);
     }
